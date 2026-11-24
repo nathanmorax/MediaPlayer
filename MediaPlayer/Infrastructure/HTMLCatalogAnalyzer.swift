@@ -9,7 +9,7 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
 
     init(
         session: URLSession = .shared,
-        extractors: [any CatalogExtracting] = [JSONLDCatalogExtractor(), HTMLLinkCatalogExtractor()]
+        extractors: [any CatalogExtracting] = [JSONLDCatalogExtractor(), HTMLMediaCatalogExtractor()]
     ) {
         self.session = session
         self.extractors = extractors
@@ -19,7 +19,7 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
         guard CatalogURL.resolve(url.absoluteString) != nil else { throw CatalogError.invalidURL }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue(
-            "text/html, application/xhtml+xml, video/mp4, application/vnd.apple.mpegurl, */*;q=0.5",
+            "text/html, application/xhtml+xml, video/*, audio/*, image/*, application/vnd.apple.mpegurl, */*;q=0.5",
             forHTTPHeaderField: "Accept"
         )
         let (bytes, response) = try await session.bytes(for: request)
@@ -34,11 +34,13 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
         }
 
         let mimeType = response.mimeType?.lowercased()
-        if CatalogURL.isDirectVideo(finalURL, mimeType: mimeType) {
+        if let kind = CatalogURL.mediaKind(finalURL, mimeType: mimeType)
+            ?? (CatalogURL.isEmbeddedPlayer(finalURL) ? .embedded : nil) {
             let filename = finalURL.deletingPathExtension().lastPathComponent
-            let title = filename.isEmpty ? "Video" : filename
-            let item = CatalogItem(title: title, pageURL: finalURL, kind: .video, playbackURL: finalURL)
-            return CatalogPage(title: title, summary: nil, imageURL: nil, sourceURL: finalURL, items: [item])
+            let title = filename.isEmpty ? finalURL.host() ?? "Multimedia" : filename
+            let media = CatalogMedia(kind: kind, url: finalURL)
+            let item = CatalogItem(title: title, pageURL: finalURL, media: media)
+            return CatalogPage(title: title, summary: nil, sourceURL: finalURL, items: [item])
         }
 
         guard mimeType == nil || mimeType == "text/html" || mimeType == "application/xhtml+xml" else {
@@ -77,18 +79,27 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
         let image = try document.select("meta[property=og:image]").first()?.attr("abs:content")
 
         var items: [CatalogItem] = []
+        var itemIDs: Set<CatalogItem.ID> = []
+        var mediaURLs: Set<URL> = []
         for extractor in extractors {
-            var seen: Set<CatalogItem.ID> = []
-            items = try extractor.items(in: document, sourceURL: url)
-                .filter { seen.insert($0.id).inserted }
-            if !items.isEmpty { break }
+            for item in try extractor.items(in: document, sourceURL: url) {
+                guard itemIDs.insert(item.id).inserted else { continue }
+                if let media = item.media, !mediaURLs.insert(media.url).inserted, !item.isEvent { continue }
+                items.append(item)
+            }
+        }
+        let posters = Set(items.compactMap { $0.media?.kind == .image ? nil : $0.imageURL })
+        items.removeAll { item in
+            item.media?.kind == .image && item.media.map { posters.contains($0.url) } == true
+        }
+        if items.count == 1, items[0].imageURL == nil, items[0].media?.kind != .image {
+            items[0].imageURL = image.flatMap { CatalogURL.resolve($0) }
         }
         try Task.checkCancellation()
 
         return CatalogPage(
             title: title.isEmpty ? url.host() ?? url.absoluteString : title,
             summary: summary,
-            imageURL: image.flatMap { CatalogURL.resolve($0) },
             sourceURL: url,
             items: Array(items.prefix(30))
         )

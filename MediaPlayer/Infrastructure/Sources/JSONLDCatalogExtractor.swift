@@ -27,6 +27,9 @@ nonisolated struct JSONLDCatalogExtractor: CatalogExtracting {
         if names.contains("VideoObject"), let video = video(from: object, at: sourceURL) {
             items.append(video)
         }
+        if names.contains("AudioObject"), let audio = audio(from: object, at: sourceURL) {
+            items.append(audio)
+        }
         for key in ["@graph", "itemListElement", "item", "mainEntity", "video"] {
             if let child = object[key] { collect(child, sourceURL: sourceURL, into: &items) }
         }
@@ -43,27 +46,47 @@ nonisolated struct JSONLDCatalogExtractor: CatalogExtracting {
         return CatalogItem(
             title: title,
             pageURL: url(object["url"], relativeTo: base) ?? base,
-            kind: .event,
             summary: text(object["description"]),
             imageURL: url(object["image"], relativeTo: base),
-            startDate: date(object["startDate"])
+            startDate: date(object["startDate"]),
+            media: (object["video"] as? [String: Any]).flatMap { videoMedia(from: $0, at: base) },
+            isEvent: true
         )
     }
 
     private func video(from object: [String: Any], at base: URL) -> CatalogItem? {
-        guard let title = text(object["name"]) else { return nil }
-        let contentURL = url(object["contentUrl"], relativeTo: base)
-        let mimeType = text(object["encodingFormat"])
-        let playbackURL = contentURL.flatMap {
-            CatalogURL.isDirectVideo($0, mimeType: mimeType) ? $0 : nil
-        }
+        guard let media = videoMedia(from: object, at: base) else { return nil }
         return CatalogItem(
-            title: title,
-            pageURL: url(object["url"], relativeTo: base) ?? url(object["embedUrl"], relativeTo: base) ?? base,
-            kind: .video,
+            title: text(object["name"]) ?? "Video",
+            pageURL: url(object["url"], relativeTo: base) ?? base,
             summary: text(object["description"]),
             imageURL: url(object["thumbnailUrl"], relativeTo: base) ?? url(object["image"], relativeTo: base),
-            playbackURL: playbackURL
+            media: media
+        )
+    }
+
+    private func videoMedia(from object: [String: Any], at base: URL) -> CatalogMedia? {
+        if let contentURL = url(object["contentUrl"], relativeTo: base),
+           CatalogURL.mediaKind(contentURL, mimeType: text(object["encodingFormat"])) == .video {
+            return CatalogMedia(kind: .video, url: contentURL)
+        }
+        if let embedURL = url(object["embedUrl"], relativeTo: base) {
+            return CatalogMedia(kind: .embedded, url: embedURL)
+        }
+        return nil
+    }
+
+    private func audio(from object: [String: Any], at base: URL) -> CatalogItem? {
+        guard let contentURL = url(object["contentUrl"], relativeTo: base),
+              CatalogURL.mediaKind(contentURL, mimeType: text(object["encodingFormat"])) == .audio else {
+            return nil
+        }
+        return CatalogItem(
+            title: text(object["name"]) ?? "Audio",
+            pageURL: url(object["url"], relativeTo: base) ?? base,
+            summary: text(object["description"]),
+            imageURL: url(object["image"], relativeTo: base),
+            media: CatalogMedia(kind: .audio, url: contentURL)
         )
     }
 

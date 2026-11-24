@@ -10,7 +10,8 @@ import SwiftUI
 
 @main
 struct MediaPlayerApp: App {
-    private let analyzer = HTMLCatalogAnalyzer()
+    private let analyzer = WebCatalogAnalyzer()
+    @State private var favorites = FavoritesStore()
 
     init() {
         AVPlayer.isObservationEnabled = true
@@ -18,7 +19,7 @@ struct MediaPlayerApp: App {
 
     var body: some Scene {
         WindowGroup("MediaPlayer") {
-            ContentView(analyzer: analyzer)
+            ContentView(analyzer: analyzer, favorites: favorites)
                 .preferredColorScheme(.dark)
         }
         #if os(macOS)

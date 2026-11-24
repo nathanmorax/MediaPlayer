@@ -2,100 +2,58 @@ import SwiftUI
 
 struct CatalogResultsView: View {
     let page: CatalogPage
-    let openBrowser: () -> Void
 
     var body: some View {
         let sections = sections
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                header
+        if sections.isEmpty {
+            ContentUnavailableView(
+                "Sin multimedia disponible",
+                systemImage: "play.rectangle",
+                description: Text("La página no publicó ningún recurso compatible.")
+            )
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 27) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(page.title)
+                            .font(.system(size: 29, weight: .semibold))
+                            .lineLimit(2)
+                            .accessibilityAddTraits(.isHeader)
+                        if let summary = page.summary {
+                            Text(summary)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
 
-                if page.items.isEmpty {
-                    ContentUnavailableView(
-                        "Sin elementos para mostrar",
-                        systemImage: "square.dashed",
-                        description: Text("Abre el sitio y analiza la página cargada para incluir contenido dinámico.")
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 220)
-                } else {
                     ForEach(sections) { section in
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 12) {
                             if let date = section.date {
                                 Text(date, format: .dateTime.weekday(.wide).day().month(.wide))
-                                    .font(.title3.weight(.semibold))
-                            } else if sections.count > 1 {
-                                Text("Más contenido")
-                                    .font(.title3.weight(.semibold))
+                                    .font(.headline)
+                                    .accessibilityAddTraits(.isHeader)
                             }
                             grid(section.items)
                         }
                     }
                 }
-            }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
-            .frame(maxWidth: 1_600)
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 24) {
-                headerText
-                Spacer(minLength: 12)
-                browserButton
-            }
-            VStack(alignment: .leading, spacing: 14) {
-                headerText
-                browserButton
+                .padding(.horizontal, 30)
+                .padding(.vertical, 26)
+                .frame(maxWidth: 1_240, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
         }
-    }
-
-    private var headerText: some View {
-        HStack(alignment: .center, spacing: 20) {
-            if let imageURL = page.imageURL {
-                CatalogArtwork(imageURL: imageURL, symbol: "globe")
-                    .frame(width: 144, height: 81)
-                    .clipShape(.rect(cornerRadius: 12))
-                    .accessibilityHidden(true)
-            }
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text(page.sourceURL.host() ?? page.sourceURL.absoluteString)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(page.title)
-                    .font(.largeTitle.weight(.semibold))
-                    .lineLimit(3)
-                    .accessibilityAddTraits(.isHeader)
-                if let summary = page.summary {
-                    Text(summary)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                }
-            }
-        }
-    }
-
-    private var browserButton: some View {
-        Button("Abrir sitio", systemImage: "arrow.up.right", action: openBrowser)
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .fixedSize()
     }
 
     private func grid(_ items: [CatalogItem]) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 18)], spacing: 23) {
             ForEach(items) { item in
                 NavigationLink(value: item) {
                     CatalogCardView(item: item)
                 }
                 .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
             }
         }
     }

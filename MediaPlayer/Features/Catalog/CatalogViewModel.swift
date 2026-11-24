@@ -7,27 +7,27 @@ final class CatalogViewModel {
         case idle
         case loading
         case loaded(CatalogPage)
-        case failed(String, URL?)
+        case failed(String)
     }
 
     var address = ""
     private(set) var state: State = .idle
+    private(set) var loadedURL: URL?
     private let analyzer: any CatalogAnalyzing
+    private var activeRequest: UUID?
 
     init(analyzer: any CatalogAnalyzing) {
         self.analyzer = analyzer
     }
 
-    var isLoading: Bool {
-        if case .loading = state { return true }
-        return false
-    }
-
-    func load() async {
-        guard !isLoading else { return }
-        guard let url = CatalogURL.address(address) else {
-            state = .failed(CatalogError.invalidURL.localizedDescription, nil)
-            return
+    func load(_ input: String) async -> CatalogItem? {
+        guard !Task.isCancelled else { return nil }
+        let request = UUID()
+        activeRequest = request
+        loadedURL = nil
+        guard let url = CatalogURL.address(input) else {
+            state = .failed(CatalogError.invalidURL.localizedDescription)
+            return nil
         }
 
         address = url.absoluteString
@@ -35,18 +35,25 @@ final class CatalogViewModel {
         do {
             let page = try await analyzer.analyze(url)
             try Task.checkCancellation()
+            guard activeRequest == request else { return nil }
+            loadedURL = url
             state = .loaded(page)
-        } catch let error as URLError where error.code == .cancelled {
-            state = .idle
+            return page.directItem
         } catch {
-            state = Task.isCancelled ? .idle : .failed(error.localizedDescription, url)
+            guard activeRequest == request else { return nil }
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                state = .idle
+            } else {
+                state = .failed(error.localizedDescription)
+            }
         }
+        return nil
     }
 
-    func loadRenderedHTML(_ html: String, at url: URL) async throws {
-        let page = try await analyzer.analyzeRenderedHTML(html, at: url)
-        try Task.checkCancellation()
-        address = page.sourceURL.absoluteString
-        state = .loaded(page)
+    func reset() {
+        activeRequest = nil
+        loadedURL = nil
+        address = ""
+        state = .idle
     }
 }

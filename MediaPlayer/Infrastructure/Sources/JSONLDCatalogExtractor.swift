@@ -45,7 +45,7 @@ nonisolated struct JSONLDCatalogExtractor: CatalogExtracting {
 
         return CatalogItem(
             title: title,
-            pageURL: url(object["url"], relativeTo: base) ?? base,
+            pageURL: linkedURL(object["url"], from: base),
             summary: text(object["description"]),
             imageURL: url(object["image"], relativeTo: base),
             startDate: date(object["startDate"]),
@@ -55,10 +55,12 @@ nonisolated struct JSONLDCatalogExtractor: CatalogExtracting {
     }
 
     private func video(from object: [String: Any], at base: URL) -> CatalogItem? {
-        guard let media = videoMedia(from: object, at: base) else { return nil }
+        let media = videoMedia(from: object, at: base)
+        let pageURL = linkedURL(object["url"], from: base)
+        guard media != nil || pageURL != nil else { return nil }
         return CatalogItem(
             title: text(object["name"]) ?? "Video",
-            pageURL: url(object["url"], relativeTo: base) ?? base,
+            pageURL: pageURL,
             summary: text(object["description"]),
             imageURL: url(object["thumbnailUrl"], relativeTo: base) ?? url(object["image"], relativeTo: base),
             media: media
@@ -83,11 +85,15 @@ nonisolated struct JSONLDCatalogExtractor: CatalogExtracting {
         }
         return CatalogItem(
             title: text(object["name"]) ?? "Audio",
-            pageURL: url(object["url"], relativeTo: base) ?? base,
             summary: text(object["description"]),
             imageURL: url(object["image"], relativeTo: base),
             media: CatalogMedia(kind: .audio, url: contentURL)
         )
+    }
+
+    private func linkedURL(_ value: Any?, from base: URL) -> URL? {
+        guard let link = url(value, relativeTo: base), link != base else { return nil }
+        return link
     }
 
     private func text(_ value: Any?) -> String? {

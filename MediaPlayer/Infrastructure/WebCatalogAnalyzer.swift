@@ -7,25 +7,23 @@ final class WebCatalogAnalyzer: CatalogAnalyzing {
 
     func analyze(_ url: URL) async throws -> CatalogPage {
         let original = try await htmlAnalyzer.analyze(url)
-        guard original.directItem == nil, await !containsPlayableMedia(original) else { return original }
+        guard original.directItem == nil, !original.items.contains(where: { $0.media?.isPlayable == true }) else {
+            return original
+        }
 
         do {
             let rendered = try await render(original.sourceURL)
             let expanded = try await htmlAnalyzer.analyzeRenderedHTML(rendered.html, at: rendered.url)
-            if await containsPlayableMedia(expanded) || expanded.items.count > original.items.count {
+            let newLinks = Set(expanded.items.compactMap(\.pageURL))
+                .subtracting(original.items.compactMap(\.pageURL))
+            if expanded.items.contains(where: { $0.media?.isPlayable == true })
+                || !newLinks.isEmpty || expanded.items.count > original.items.count {
                 return expanded
             }
         } catch {
             try Task.checkCancellation()
         }
         return original
-    }
-
-    private func containsPlayableMedia(_ catalog: CatalogPage) -> Bool {
-        catalog.items.contains { item in
-            guard let media = item.media else { return false }
-            return media.kind != .image
-        }
     }
 
     private func render(_ url: URL) async throws -> (html: String, url: URL) {

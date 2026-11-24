@@ -39,7 +39,7 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
             let filename = finalURL.deletingPathExtension().lastPathComponent
             let title = filename.isEmpty ? finalURL.host() ?? "Multimedia" : filename
             let media = CatalogMedia(kind: kind, url: finalURL)
-            let item = CatalogItem(title: title, pageURL: finalURL, media: media)
+            let item = CatalogItem(title: title, media: media)
             return CatalogPage(title: title, summary: nil, sourceURL: finalURL, items: [item])
         }
 

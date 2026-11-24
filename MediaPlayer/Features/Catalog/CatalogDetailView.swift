@@ -101,7 +101,8 @@ struct CatalogDetailView: View {
         case .image:
             CatalogImageView(url: media.url)
         case .embedded:
-            EmbeddedPlayerView(url: media.url)
+            EmbeddedPlayerView(media: media)
+                .id(media)
         }
     }
 }

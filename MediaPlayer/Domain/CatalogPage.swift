@@ -47,6 +47,7 @@ nonisolated struct CatalogMedia: Hashable, Sendable {
 
     let kind: Kind
     let url: URL
+    var sourcePageURL: URL? = nil
 
     var isPlayable: Bool { kind != .image }
 }

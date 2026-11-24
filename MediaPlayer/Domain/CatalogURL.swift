@@ -59,4 +59,9 @@ nonisolated enum CatalogURL {
             return false
         }
     }
+
+    static func isMediaPage(_ url: URL) -> Bool {
+        let routes = ["en-vivo", "en-directo", "directo", "live", "watch", "canal", "channel"]
+        return url.path().split(separator: "/").dropLast().contains { routes.contains($0.lowercased()) }
+    }
 }

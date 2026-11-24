@@ -80,11 +80,20 @@ actor HTMLCatalogAnalyzer: CatalogAnalyzing {
 
         var items: [CatalogItem] = []
         var itemIDs: Set<CatalogItem.ID> = []
-        var mediaURLs: Set<URL> = []
+        var mediaIndices: [URL: Int] = [:]
         for extractor in extractors {
             for item in try extractor.items(in: document, sourceURL: url) {
+                if let media = item.media, let index = mediaIndices[media.url] {
+                    if media.kind == .embedded, items[index].media?.kind == .embedded,
+                       items[index].media?.sourcePageURL == nil, let sourcePageURL = media.sourcePageURL {
+                        items[index].media?.sourcePageURL = sourcePageURL
+                    }
+                    if !item.isEvent { continue }
+                }
                 guard itemIDs.insert(item.id).inserted else { continue }
-                if let media = item.media, !mediaURLs.insert(media.url).inserted, !item.isEvent { continue }
+                if let media = item.media, mediaIndices[media.url] == nil {
+                    mediaIndices[media.url] = items.count
+                }
                 items.append(item)
             }
         }

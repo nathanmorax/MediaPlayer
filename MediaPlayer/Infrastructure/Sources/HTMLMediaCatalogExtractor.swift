@@ -22,7 +22,7 @@ nonisolated struct HTMLMediaCatalogExtractor: CatalogExtracting {
             let hasPlayerControls = element.hasAttr("allowfullscreen") && url.path().split(separator: "/")
                 .contains { ["embed", "player", "watch"].contains($0.lowercased()) }
             guard isDeclaredPlayer || hasPlayerControls || CatalogURL.isEmbeddedPlayer(url) else { continue }
-            let media = CatalogMedia(kind: .embedded, url: url)
+            let media = CatalogMedia(kind: .embedded, url: url, sourcePageURL: sourceURL)
             items.append(try item(media, from: element, title: title))
         }
 
@@ -47,6 +47,21 @@ nonisolated struct HTMLMediaCatalogExtractor: CatalogExtracting {
             let label = text.isEmpty ? try thumbnail?.attr("alt") ?? "" : text
             let artwork = try thumbnail.flatMap { try imageURL(of: $0) }
             items.append(try item(.init(kind: kind, url: url), from: link, title: label, imageURL: artwork))
+        }
+
+        for link in try document.select("main a[href], article a[href], [role=main] a[href]") {
+            guard let target = try pageURL(of: link, from: sourceURL),
+                  CatalogURL.isMediaPage(target),
+                  CatalogURL.mediaKind(target) == nil, !CatalogURL.isEmbeddedPlayer(target) else { continue }
+            let card = sequence(first: link, next: { $0.parent() }).dropFirst().prefix(4).first {
+                $0.hasClass("card") || $0.tagName() == "article"
+            }
+            let heading = try card?.select("h2, h3, h4").first()?.text()
+            let title = try itemTitle(from: link, fallback: heading ?? link.text(), url: target)
+            let thumbnail = try card?.select("img").first() ?? link.select("img").first()
+            let artwork = try thumbnail.flatMap { try imageURL(of: $0) }
+            let summary = try card?.select("p").first()?.text()
+            items.append(CatalogItem(title: title, pageURL: target, summary: summary, imageURL: artwork))
         }
 
         let mainImages = try document.select("main img, article img, figure img, [role=main] img")

@@ -34,7 +34,11 @@ struct CatalogAVPlayerView: View {
     private var playbackContent: some View {
         if let player {
             if player.currentItem?.status == .failed {
-                ContentUnavailableView("No se pudo reproducir el contenido", systemImage: "play.slash")
+                ContentUnavailableView(
+                    "No se pudo reproducir el contenido",
+                    systemImage: "play.slash",
+                    description: player.currentItem?.error.map { Text($0.localizedDescription) }
+                )
             } else if media.kind == .audio {
                 AudioTransportView(player: player)
             } else {

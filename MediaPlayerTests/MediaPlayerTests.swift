@@ -136,6 +136,35 @@ final class MediaPlayerTests: XCTestCase {
         XCTAssertEqual(detail.preferredMediaItem?.media?.url.absoluteString, "https://example.com/player/partido")
     }
 
+    func testChannelCardKeepsItsLinkAndEmbeddedPlayerSource() async throws {
+        let home = try XCTUnwrap(URL(string: "https://example.com/"))
+        let analyzer = HTMLCatalogAnalyzer()
+        let catalog = try await analyzer.analyzeRenderedHTML("""
+        <main><div class="card">
+          <div class="card-image"><img src="/sports.webp" alt="Canal deportivo" width="300" height="170"></div>
+          <div class="card-content"><h3>Deportes</h3><a href="/en-vivo/deportes">Ver canal</a></div>
+        </div></main>
+        """, at: home)
+
+        XCTAssertEqual(catalog.items.map(\.title), ["Deportes"])
+        let channel = try XCTUnwrap(catalog.items.first)
+        XCTAssertEqual(channel.imageURL?.absoluteString, "https://example.com/sports.webp")
+        XCTAssertNil(channel.media)
+        let channelURL = try XCTUnwrap(channel.pageURL)
+
+        let page = try await analyzer.analyzeRenderedHTML("""
+        <script type="application/ld+json">
+          {"@type":"VideoObject","name":"En directo","embedUrl":"https://player.example.com/canal.php?stream=deportes"}
+        </script>
+        <main><iframe loading="lazy" allowfullscreen allow="encrypted-media"
+          src="https://player.example.com/canal.php?stream=deportes"></iframe></main>
+        """, at: channelURL)
+
+        XCTAssertEqual(page.items.count, 1)
+        XCTAssertEqual(page.preferredMediaItem?.media?.kind, .embedded)
+        XCTAssertEqual(page.preferredMediaItem?.media?.sourcePageURL, channelURL)
+    }
+
     @MainActor
     func testFavoritesPersistAndAvoidDuplicates() async throws {
         let suite = "MediaPlayerTests.\(UUID().uuidString)"

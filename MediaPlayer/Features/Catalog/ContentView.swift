@@ -29,7 +29,7 @@ struct ContentView: View {
                     .navigationDestination(for: CatalogItem.self) { item in
                         CatalogDetailView(item: item, analyzer: analyzer)
                             .toolbar {
-                                if let url = item.pageURL ?? item.media?.url {
+                                if let url = item.pageURL ?? item.media?.sourcePageURL ?? item.media?.url {
                                     ToolbarItem {
                                         let isFavorite = favorites.contains(url)
                                         Button {

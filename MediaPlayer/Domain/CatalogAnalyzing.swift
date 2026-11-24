@@ -2,7 +2,6 @@ import Foundation
 
 nonisolated protocol CatalogAnalyzing: Sendable {
     func analyze(_ url: URL) async throws -> CatalogPage
-    func analyzeRenderedHTML(_ html: String, at url: URL) async throws -> CatalogPage
 }
 
 nonisolated enum CatalogError: LocalizedError {

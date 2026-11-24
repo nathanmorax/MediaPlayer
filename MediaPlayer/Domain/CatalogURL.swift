@@ -22,13 +22,39 @@ nonisolated enum CatalogURL {
         return url
     }
 
-    static func isDirectVideo(_ url: URL, mimeType: String? = nil) -> Bool {
-        switch mimeType?.lowercased() {
+    static func mediaKind(_ url: URL, mimeType: String? = nil) -> CatalogMedia.Kind? {
+        let type = mimeType?.split(separator: ";").first?.trimmingCharacters(in: .whitespaces).lowercased()
+        switch type {
         case "application/vnd.apple.mpegurl", "application/x-mpegurl", "audio/mpegurl",
              "audio/x-mpegurl", "video/mp4", "video/quicktime", "video/x-m4v":
-            return true
+            return .video
+        case "audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac", "audio/wav",
+             "audio/x-wav", "audio/aiff", "audio/x-aiff", "audio/flac", "audio/x-flac":
+            return .audio
+        case "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+             "image/heic", "image/heif", "image/tiff", "image/bmp":
+            return .image
         case nil, "application/octet-stream", "binary/octet-stream":
-            return ["m3u8", "mp4", "m4v", "mov"].contains(url.pathExtension.lowercased())
+            switch url.pathExtension.lowercased() {
+            case "m3u8", "mp4", "m4v", "mov": return .video
+            case "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac": return .audio
+            case "jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "heif", "tiff", "bmp": return .image
+            default: return nil
+            }
+        default:
+            return nil
+        }
+    }
+
+    static func isEmbeddedPlayer(_ url: URL) -> Bool {
+        let path = url.path()
+        switch url.host()?.lowercased() {
+        case "www.youtube.com", "youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com":
+            return path.hasPrefix("/embed/")
+        case "player.vimeo.com":
+            return path.hasPrefix("/video/")
+        case "www.dailymotion.com", "dailymotion.com":
+            return path.hasPrefix("/embed/video/")
         default:
             return false
         }
